@@ -148,7 +148,7 @@ class BaseViewer {
     this.linkService = options.linkService || new SimpleLinkService();
     this.downloadManager = options.downloadManager || null;
     this.findController = options.findController || null;
-    this.removePageBorders = options.removePageBorders || false;
+    this.removePageBorders = options.removePageBorders || true; // false; CROQUET
     this.textLayerMode = Number.isInteger(options.textLayerMode)
       ? options.textLayerMode
       : TextLayerMode.ENABLE;
@@ -632,7 +632,7 @@ class BaseViewer {
     scrollIntoView(pageDiv, pageSpot);
   }
 
-  _setScaleUpdatePages(newScale, newValue, noScroll = false, preset = false) {
+  _setScaleUpdatePages(requestedScale, newScale, newValue, noScroll = false, preset = false) {
     this._currentScaleValue = newValue.toString();
 
     if (isSameScale(this._currentScale, newScale)) {
@@ -640,6 +640,7 @@ class BaseViewer {
         this.eventBus.dispatch("scalechanging", {
           source: this,
           scale: newScale,
+          requestedScale,
           presetValue: newValue,
         });
       }
@@ -677,6 +678,7 @@ class BaseViewer {
     this.eventBus.dispatch("scalechanging", {
       source: this,
       scale: newScale,
+      requestedScale,
       presetValue: preset ? newValue : undefined,
     });
 
@@ -686,57 +688,81 @@ class BaseViewer {
   }
 
   _setScale(value, noScroll = false) {
-    let scale = parseFloat(value);
+    let requestedScale = parseFloat(value);
 
-    if (scale > 0) {
-      this._setScaleUpdatePages(scale, value, noScroll, /* preset = */ false);
-    } else {
-      const currentPage = this._pages[this._currentPageNumber - 1];
-      if (!currentPage) {
-        return;
-      }
-      const noPadding = this.isInPresentationMode || this.removePageBorders;
-      let hPadding = noPadding ? 0 : SCROLLBAR_PADDING;
-      let vPadding = noPadding ? 0 : VERTICAL_PADDING;
+    // CROQUET - menu only has numbers, but we interpret them as a multiplier for
+    // browser's current window width.
 
-      if (!noPadding && this._isScrollModeHorizontal) {
-        [hPadding, vPadding] = [vPadding, hPadding]; // Swap the padding values.
-      }
-      const pageWidthScale =
-        ((this.container.clientWidth - hPadding) / currentPage.width) *
-        currentPage.scale;
-      const pageHeightScale =
-        ((this.container.clientHeight - vPadding) / currentPage.height) *
-        currentPage.scale;
-      switch (value) {
-        case "page-actual":
-          scale = 1;
-          break;
-        case "page-width":
-          scale = pageWidthScale;
-          break;
-        case "page-height":
-          scale = pageHeightScale;
-          break;
-        case "page-fit":
-          scale = Math.min(pageWidthScale, pageHeightScale);
-          break;
-        case "auto":
-          // For pages in landscape mode, fit the page height to the viewer
-          // *unless* the page would thus become too wide to fit horizontally.
-          const horizontalScale = isPortraitOrientation(currentPage)
-            ? pageWidthScale
-            : Math.min(pageHeightScale, pageWidthScale);
-          scale = Math.min(MAX_AUTO_SCALE, horizontalScale);
-          break;
-        default:
-          console.error(
-            `${this._name}._setScale: "${value}" is an unknown zoom value.`
-          );
-          return;
-      }
-      this._setScaleUpdatePages(scale, value, noScroll, /* preset = */ true);
+    // if (scale > 0) {
+    //   this._setScaleUpdatePages(scale, value, noScroll, /* preset = */ false);
+    // } else {
+    const currentPage = this._pages[this._currentPageNumber - 1];
+    if (!currentPage) {
+      return;
     }
+    const noPadding = this.isInPresentationMode || this.removePageBorders;
+    let hPadding = noPadding ? 0 : SCROLLBAR_PADDING;
+    let vPadding = noPadding ? 0 : VERTICAL_PADDING;
+
+    if (!noPadding && this._isScrollModeHorizontal) {
+      [hPadding, vPadding] = [vPadding, hPadding]; // Swap the padding values.
+    }
+
+    // CROQUET
+    // page height and width refer to the elements as rendered in the DOM; both a
+    // landscape document, and a portrait document that has been rotated 90 degrees,
+    // will have page elements with width > height.
+    // for accuracy of scroll alignment across clients with different scales, each
+    // client must choose its scale value such that the page's scaled height (in a
+    // vertical-scrolled view) or width (in a horizontal-scrolled view) is as close
+    // as possible to the integer value that the DOM page elements will be given.
+    // here we only apply the necessary adjustment to pageWidthScale, which we expect
+    // to be used in Croquet applications.
+    let pageWidthScale =
+      requestedScale *
+      ((this.container.clientWidth - hPadding) / currentPage.width) *
+      currentPage.scale;
+    const valueThatShouldBeInteger = (this._isScrollModeHorizontal ? currentPage.width : currentPage.height) * pageWidthScale / currentPage.scale;
+    // the pixel size will be truncated, so add 0.5 to ensure that the scaled value
+    // will truncate to the right integer (not accidentally 123.99999999998).
+    const roundingFactor = (Math.round(valueThatShouldBeInteger) + 0.5) / valueThatShouldBeInteger;
+    pageWidthScale *= roundingFactor;
+    // console.log({ width: currentPage.width * pageWidthScale / currentPage.scale, height: currentPage.height * pageWidthScale / currentPage.scale });
+
+    // const pageHeightScale =
+    //   ((this.container.clientHeight - vPadding) / currentPage.height) *
+    //   currentPage.scale;
+    // switch (value) {
+    //   case "page-actual":
+    //     scale = 1;
+    //     break;
+    //   case "page-width":
+    //     scale = pageWidthScale;
+    //     break;
+    //   case "page-height":
+    //     scale = pageHeightScale;
+    //     break;
+    //   case "page-fit":
+    //     scale = Math.min(pageWidthScale, pageHeightScale);
+    //     break;
+    //   case "auto":
+    //     // For pages in landscape mode, fit the page height to the viewer
+    //     // *unless* the page would thus become too wide to fit horizontally.
+    //     const horizontalScale = isPortraitOrientation(currentPage)
+    //       ? pageWidthScale
+    //       : Math.min(pageHeightScale, pageWidthScale);
+    //     scale = Math.min(MAX_AUTO_SCALE, horizontalScale);
+    //     break;
+    //   default:
+    //     console.error(
+    //       `${this._name}._setScale: "${value}" is an unknown zoom value.`
+    //     );
+    //     return;
+    // }
+
+    const scale = pageWidthScale;
+    this._setScaleUpdatePages(requestedScale, scale, value, noScroll, /* preset = */ false);
+    // }
   }
 
   /**

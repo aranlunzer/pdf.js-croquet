@@ -107,9 +107,10 @@ class Toolbar {
     this._updateUIState(true);
   }
 
-  setPageScale(pageScaleValue, pageScale) {
+  setPageScale(pageScaleValue, pageScale, requestedPageScale) {
     this.pageScaleValue = (pageScaleValue || pageScale).toString();
     this.pageScale = pageScale;
+    this.requestedPageScale = requestedPageScale;
     this._updateUIState(false);
   }
 
@@ -120,6 +121,7 @@ class Toolbar {
     this.pagesCount = 0;
     this.pageScaleValue = DEFAULT_SCALE_VALUE;
     this.pageScale = DEFAULT_SCALE;
+    this.requestedPageScale = DEFAULT_SCALE;
     this._updateUIState(true);
     this.updateLoadingIndicatorState();
   }
@@ -171,8 +173,8 @@ class Toolbar {
       // Don't update the UI state until we localize the toolbar.
       return;
     }
-    const { pageNumber, pagesCount, pageScaleValue, pageScale, items } = this;
-
+    const { pageNumber, pagesCount, pageScaleValue, pageScale, requestedPageScale, items } = this;
+console.warn({ pageScaleValue, pageScale, requestedPageScale });
     if (resetNumPages) {
       if (this.hasPageLabels) {
         items.pageNumber.type = "text";
@@ -208,7 +210,8 @@ class Toolbar {
     items.zoomOut.disabled = pageScale <= MIN_SCALE;
     items.zoomIn.disabled = pageScale >= MAX_SCALE;
 
-    const customScale = Math.round(pageScale * 10000) / 100;
+    // const customScale = Math.round(pageScale * 10000) / 100;
+    const customScale = Math.round(requestedPageScale * 10000) / 100;
     this.l10n
       .get("page_scale_percent", { scale: customScale }, "{{scale}}%")
       .then(msg => {
@@ -242,12 +245,13 @@ class Toolbar {
   async _adjustScaleWidth() {
     const { items, l10n } = this;
 
-    const predefinedValuesPromise = Promise.all([
-      l10n.get("page_scale_auto", null, "Automatic Zoom"),
-      l10n.get("page_scale_actual", null, "Actual Size"),
-      l10n.get("page_scale_fit", null, "Page Fit"),
-      l10n.get("page_scale_width", null, "Page Width"),
-    ]);
+    // const predefinedValuesPromise = Promise.all([
+    //   l10n.get("page_scale_auto", null, "Automatic Zoom"),
+    //   l10n.get("page_scale_actual", null, "Actual Size"),
+    //   l10n.get("page_scale_fit", null, "Page Fit"),
+    //   l10n.get("page_scale_width", null, "Page Width"),
+    // ]);
+    const predefinedValuesPromise = Promise.resolve([]);
 
     // The temporary canvas is used to measure text length in the DOM.
     let canvas = document.createElement("canvas");

@@ -2273,6 +2273,7 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
 function webViewerPresentationMode() {
   PDFViewerApplication.requestPresentationMode();
 }
+
 function webViewerPrint() {
   window.print();
 }
@@ -2386,8 +2387,7 @@ function webViewerUpdateFindControlState({ state, previous, matchesCount }) {
 }
 
 function webViewerScaleChanging(evt) {
-  PDFViewerApplication.toolbar.setPageScale(evt.presetValue, evt.scale);
-
+  PDFViewerApplication.toolbar.setPageScale(evt.presetValue, evt.scale, evt.requestedScale);
   PDFViewerApplication.pdfViewer.update();
 }
 

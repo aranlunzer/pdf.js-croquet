@@ -182,6 +182,28 @@ html[dir='rtl'] #sidebarContent {
   transition-duration: var(--sidebar-transition-duration);
   transition-timing-function: var(--sidebar-transition-timing-function);
 }
+#viewerContainer::-webkit-scrollbar {
+  width: 14px;
+}
+#viewerContainer::-webkit-scrollbar-track {
+  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+  border-radius: 4px;
+  background: #eee;
+}
+#viewerContainer.scrollClash::-webkit-scrollbar-track {
+  background: #f88;
+}
+#viewerContainer::-webkit-scrollbar-thumb {
+  -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
+  border-radius: 4px;
+  background: #aaa;
+  min-height: 28px;
+}
+#viewerContainer::-webkit-scrollbar-thumb:hover {
+  background: #888;
+}
 html[dir='ltr'] #viewerContainer {
   box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05);
 }
