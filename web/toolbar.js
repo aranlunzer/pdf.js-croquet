@@ -107,10 +107,9 @@ class Toolbar {
     this._updateUIState(true);
   }
 
-  setPageScale(pageScaleValue, pageScale, requestedPageScale) {
+  setPageScale(pageScaleValue, pageScale) {
     this.pageScaleValue = (pageScaleValue || pageScale).toString();
     this.pageScale = pageScale;
-    this.requestedPageScale = requestedPageScale;
     this._updateUIState(false);
   }
 
@@ -121,7 +120,6 @@ class Toolbar {
     this.pagesCount = 0;
     this.pageScaleValue = DEFAULT_SCALE_VALUE;
     this.pageScale = DEFAULT_SCALE;
-    this.requestedPageScale = DEFAULT_SCALE;
     this._updateUIState(true);
     this.updateLoadingIndicatorState();
   }
@@ -173,8 +171,7 @@ class Toolbar {
       // Don't update the UI state until we localize the toolbar.
       return;
     }
-    const { pageNumber, pagesCount, pageScaleValue, pageScale, requestedPageScale, items } = this;
-console.warn({ pageScaleValue, pageScale, requestedPageScale });
+    const { pageNumber, pagesCount, pageScaleValue, pageScale, items } = this;
     if (resetNumPages) {
       if (this.hasPageLabels) {
         items.pageNumber.type = "text";
@@ -211,7 +208,7 @@ console.warn({ pageScaleValue, pageScale, requestedPageScale });
     items.zoomIn.disabled = pageScale >= MAX_SCALE;
 
     // const customScale = Math.round(pageScale * 10000) / 100;
-    const customScale = Math.round(requestedPageScale * 10000) / 100;
+    const customScale = Math.round(pageScaleValue * 10000) / 100; // for Croquet, pageScaleValue is always numeric
     this.l10n
       .get("page_scale_percent", { scale: customScale }, "{{scale}}%")
       .then(msg => {

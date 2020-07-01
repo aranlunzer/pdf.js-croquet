@@ -14,7 +14,7 @@
  */
 
 const CSS_UNITS = 96.0 / 72.0;
-const DEFAULT_SCALE_VALUE = "1";
+const DEFAULT_SCALE_VALUE = "1"; // Croquet.  used to be "auto".
 const DEFAULT_SCALE = 1.0;
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 10.0;
@@ -153,10 +153,10 @@ function scrollIntoView(element, spot, skipOverflowHiddenElements = false) {
     }
     if (spot.left !== undefined) {
       offsetX += spot.left;
-      parent.scrollLeft = offsetX;
+      parent.scrollLeft = Math.round(offsetX); // Croquet - don't always be truncating!
     }
   }
-  parent.scrollTop = offsetY;
+  parent.scrollTop = Math.round(offsetY); // Croquet - ditto
 }
 
 /**

@@ -74,6 +74,8 @@ import { SecondaryToolbar } from "./secondary_toolbar.js";
 import { Toolbar } from "./toolbar.js";
 import { ViewHistory } from "./view_history.js";
 
+const CROQUET = true;
+
 const DEFAULT_SCALE_DELTA = 1.1;
 const DISABLE_AUTO_FETCH_LOADING_BAR_TIMEOUT = 5000; // ms
 const FORCE_PAGES_LOADED_TIMEOUT = 10000; // ms
@@ -500,7 +502,7 @@ const PDFViewerApplication = {
     if (this.pdfViewer.isInPresentationMode) {
       return;
     }
-    let newScale = this.pdfViewer.currentScale;
+    let newScale = parseFloat(this.pdfViewer.currentScaleValue); // Croquet
     do {
       newScale = (newScale * DEFAULT_SCALE_DELTA).toFixed(2);
       newScale = Math.ceil(newScale * 10) / 10;
@@ -513,7 +515,7 @@ const PDFViewerApplication = {
     if (this.pdfViewer.isInPresentationMode) {
       return;
     }
-    let newScale = this.pdfViewer.currentScale;
+    let newScale = parseFloat(this.pdfViewer.currentScaleValue); // Croquet
     do {
       newScale = (newScale / DEFAULT_SCALE_DELTA).toFixed(2);
       newScale = Math.floor(newScale * 10) / 10;
@@ -550,6 +552,8 @@ const PDFViewerApplication = {
   },
 
   get supportsFullscreen() {
+    if (CROQUET) return false;
+
     let support;
     if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) {
       support =
@@ -1078,12 +1082,16 @@ const PDFViewerApplication = {
     const pdfThumbnailViewer = this.pdfThumbnailViewer;
     pdfThumbnailViewer.setDocument(pdfDocument);
 
-    const storedPromise = (this.store = new ViewHistory(
-      pdfDocument.fingerprint
-    ))
+    // Croquet doesn't want anything to do with local storage.  at least,
+    // not for recording document navigation history.
+    let storedPromise;
+    if (CROQUET) {
+      this.store = null;
+      storedPromise = Promise.resolve({});
+    } else storedPromise = (this.store = new ViewHistory(pdfDocument.fingerprint))
       .getMultiple({
         page: null,
-        zoom: DEFAULT_SCALE_VALUE,
+        zoom: (DEFAULT_SCALE_VALUE * 100).toString(), // Croquet.  DEFAULT_SCALE_VALUE is now numeric.
         scrollLeft: "0",
         scrollTop: "0",
         rotation: null,
@@ -1108,7 +1116,6 @@ const PDFViewerApplication = {
       ])
         .then(async ([timeStamp, stored, pageLayout, pageMode, openAction]) => {
           const viewOnLoad = AppOptions.get("viewOnLoad");
-
           this._initializePdfHistory({
             fingerprint: pdfDocument.fingerprint,
             viewOnLoad,
@@ -2196,21 +2203,40 @@ function webViewerSpreadModeChanged(evt) {
   }
 }
 
+let lastResize; // Croquet
+let resizeTimer;
 function webViewerResize() {
   const { pdfDocument, pdfViewer } = PDFViewerApplication;
   if (!pdfDocument) {
     return;
   }
-  const currentScaleValue = pdfViewer.currentScaleValue;
-  if (
-    currentScaleValue === "auto" ||
-    currentScaleValue === "page-fit" ||
-    currentScaleValue === "page-width"
-  ) {
-    // Note: the scale is constant for 'page-actual'.
-    pdfViewer.currentScaleValue = currentScaleValue;
+
+  function doResize() {
+    lastResize = Date.now();
+    resizeTimer = null; // in case that's what triggered this
+
+    const currentScaleValue = pdfViewer.currentScaleValue;
+    if (
+      CROQUET ||
+      currentScaleValue === "auto" ||
+      currentScaleValue === "page-fit" ||
+      currentScaleValue === "page-width"
+    ) {
+      // Note: the scale is constant for 'page-actual'.
+      pdfViewer.currentScaleValue = currentScaleValue;
+    }
+    pdfViewer.update();
   }
-  pdfViewer.update();
+
+  // Croquet - slow down events
+  if (resizeTimer) return; // already lined up
+
+  const now = Date.now();
+  const INTERVAL = 200;
+  if (!lastResize) lastResize = now - INTERVAL; // run immediately first time through
+  const stillToWait = lastResize + INTERVAL - now;
+  if (stillToWait <= 0) doResize();
+  else resizeTimer = setTimeout(doResize, stillToWait);
 }
 
 function webViewerHashchange(evt) {
@@ -2387,7 +2413,7 @@ function webViewerUpdateFindControlState({ state, previous, matchesCount }) {
 }
 
 function webViewerScaleChanging(evt) {
-  PDFViewerApplication.toolbar.setPageScale(evt.presetValue, evt.scale, evt.requestedScale);
+  PDFViewerApplication.toolbar.setPageScale(evt.presetValue, evt.scale);
   PDFViewerApplication.pdfViewer.update();
 }
 
@@ -2435,7 +2461,14 @@ function setZoomDisabledTimeout() {
   }, WHEEL_ZOOM_DISABLED_TIMEOUT);
 }
 
+let lastWheel; // Croquet
 function webViewerWheel(evt) {
+  // Croquet - slow down events from trackpads etc
+  const now = Date.now();
+  if (!lastWheel) lastWheel = now;
+  if (now - lastWheel < 100) return;
+  lastWheel = now;
+
   const {
     pdfViewer,
     supportedMouseWheelZoomModifierKeys,
@@ -2456,7 +2489,7 @@ function webViewerWheel(evt) {
       return;
     }
 
-    const previousScale = pdfViewer.currentScale;
+    const previousScale = parseFloat(pdfViewer.currentScaleValue); // Croquet
 
     const delta = normalizeWheelEventDelta(evt);
 
@@ -2468,7 +2501,7 @@ function webViewerWheel(evt) {
       PDFViewerApplication.zoomIn(ticks);
     }
 
-    const currentScale = pdfViewer.currentScale;
+    const currentScale = parseFloat(pdfViewer.currentScaleValue); // Croquet
     if (previousScale !== currentScale) {
       // After scaling the page via zoomIn/zoomOut, the position of the upper-
       // left corner is restored. When the mouse wheel is used, the position

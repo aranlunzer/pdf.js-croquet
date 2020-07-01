@@ -43,6 +43,8 @@ import { PDFPageView } from "./pdf_page_view.js";
 import { SimpleLinkService } from "./pdf_link_service.js";
 import { TextLayerBuilder } from "./text_layer_builder.js";
 
+const CROQUET = true;
+
 const DEFAULT_CACHE_SIZE = 10;
 
 /**
@@ -632,25 +634,19 @@ class BaseViewer {
     scrollIntoView(pageDiv, pageSpot);
   }
 
-  _setScaleUpdatePages(requestedScale, newScale, newValue, noScroll = false, preset = false) {
-    this._currentScaleValue = newValue.toString();
+  _setScaleUpdatePages(newRenderScale, newRelativeScale, noScroll = false, preset = false) {
+    const sameRenderScale = isSameScale(this._currentScale, newRenderScale);
+    const relativeScaleString = newRelativeScale.toString();
+    if (sameRenderScale && this._currentScaleValue === relativeScaleString) return;
 
-    if (isSameScale(this._currentScale, newScale)) {
-      if (preset) {
-        this.eventBus.dispatch("scalechanging", {
-          source: this,
-          scale: newScale,
-          requestedScale,
-          presetValue: newValue,
-        });
+    this._currentScaleValue = relativeScaleString;
+console.log(`new relativeScale: ${this._currentScaleValue}, local scale: ${newRenderScale}`);
+    if (!sameRenderScale) {
+      for (let i = 0, ii = this._pages.length; i < ii; i++) {
+        this._pages[i].update(newRenderScale);
       }
-      return;
+      this._currentScale = newRenderScale;
     }
-
-    for (let i = 0, ii = this._pages.length; i < ii; i++) {
-      this._pages[i].update(newScale);
-    }
-    this._currentScale = newScale;
 
     if (!noScroll) {
       let page = this._currentPageNumber,
@@ -674,12 +670,11 @@ class BaseViewer {
         allowNegativeOffset: true,
       });
     }
-
+console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relativeScaleString}`);
     this.eventBus.dispatch("scalechanging", {
       source: this,
-      scale: newScale,
-      requestedScale,
-      presetValue: preset ? newValue : undefined,
+      scale: newRenderScale,
+      presetValue: relativeScaleString,
     });
 
     if (this.defaultRenderingQueue) {
@@ -687,15 +682,20 @@ class BaseViewer {
     }
   }
 
-  _setScale(value, noScroll = false) {
-    let requestedScale = parseFloat(value);
+  _setScale(relativeScale, noScroll = false) {
+    const scaleNumeric = parseFloat(relativeScale);
 
     // CROQUET - menu only has numbers, but we interpret them as a multiplier for
     // browser's current window width.
+    // this means that we lose the connection that exists in the default viewer,
+    // when the scale is supplied numerically (rather than as a "preset" such as
+    // page width), between a _currentScaleValue such as "1.5" - perhaps arrived at
+    // from the "150%" menu item - and the page-rendering _currentScale that
+    // would correspondingly have been set to 1.5.
+    // other than when adjusting the rendering scale, the code should now be
+    // looking at _currentScaleValue (not _currentScale) to understand what it was
+    // last asked to act on.
 
-    // if (scale > 0) {
-    //   this._setScaleUpdatePages(scale, value, noScroll, /* preset = */ false);
-    // } else {
     const currentPage = this._pages[this._currentPageNumber - 1];
     if (!currentPage) {
       return;
@@ -718,50 +718,18 @@ class BaseViewer {
     // as possible to the integer value that the DOM page elements will be given.
     // here we only apply the necessary adjustment to pageWidthScale, which we expect
     // to be used in Croquet applications.
-    let pageWidthScale =
-      requestedScale *
+    let renderScale =
+      scaleNumeric *
       ((this.container.clientWidth - hPadding) / currentPage.width) *
       currentPage.scale;
-    const valueThatShouldBeInteger = (this._isScrollModeHorizontal ? currentPage.width : currentPage.height) * pageWidthScale / currentPage.scale;
-    // the pixel size will be truncated, so add 0.5 to ensure that the scaled value
+    const valueThatShouldBeInteger = (this._isScrollModeHorizontal ? currentPage.width : currentPage.height) * renderScale / currentPage.scale;
+    // the pixel size will be truncated, so add 0.01 to ensure that the scaled value
     // will truncate to the right integer (not accidentally 123.99999999998).
-    const roundingFactor = (Math.round(valueThatShouldBeInteger) + 0.5) / valueThatShouldBeInteger;
-    pageWidthScale *= roundingFactor;
-    // console.log({ width: currentPage.width * pageWidthScale / currentPage.scale, height: currentPage.height * pageWidthScale / currentPage.scale });
+    const roundingFactor = (Math.round(valueThatShouldBeInteger) + 0.01) / valueThatShouldBeInteger;
+    renderScale *= roundingFactor;
+    // console.log({ width: currentPage.width * renderScale / currentPage.scale, height: currentPage.height * renderScale / currentPage.scale });
 
-    // const pageHeightScale =
-    //   ((this.container.clientHeight - vPadding) / currentPage.height) *
-    //   currentPage.scale;
-    // switch (value) {
-    //   case "page-actual":
-    //     scale = 1;
-    //     break;
-    //   case "page-width":
-    //     scale = pageWidthScale;
-    //     break;
-    //   case "page-height":
-    //     scale = pageHeightScale;
-    //     break;
-    //   case "page-fit":
-    //     scale = Math.min(pageWidthScale, pageHeightScale);
-    //     break;
-    //   case "auto":
-    //     // For pages in landscape mode, fit the page height to the viewer
-    //     // *unless* the page would thus become too wide to fit horizontally.
-    //     const horizontalScale = isPortraitOrientation(currentPage)
-    //       ? pageWidthScale
-    //       : Math.min(pageHeightScale, pageWidthScale);
-    //     scale = Math.min(MAX_AUTO_SCALE, horizontalScale);
-    //     break;
-    //   default:
-    //     console.error(
-    //       `${this._name}._setScale: "${value}" is an unknown zoom value.`
-    //     );
-    //     return;
-    // }
-
-    const scale = pageWidthScale;
-    this._setScaleUpdatePages(requestedScale, scale, value, noScroll, /* preset = */ false);
+    this._setScaleUpdatePages(renderScale, relativeScale, noScroll, /* preset = */ false);
     // }
   }
 
@@ -817,6 +785,9 @@ class BaseViewer {
       this._setCurrentPageNumber(pageNumber, /* resetCurrentPageView = */ true);
       return;
     }
+
+    if (destArray && (destArray[1].name !== "XYZ" || destArray[4])) console.warn("unexpected destArray", destArray);
+
     let x = 0,
       y = 0;
     let width = 0,
@@ -890,7 +861,9 @@ class BaseViewer {
     }
 
     if (!ignoreDestinationZoom) {
-      if (scale && scale !== this._currentScale) {
+      // Croquet: keeping old code here in case we want to reinstate some
+      // kind of support for destArray scaling
+      if (!CROQUET && scale && scale !== this._currentScale) {
         this.currentScaleValue = scale;
       } else if (this._currentScale === UNKNOWN_SCALE) {
         this.currentScaleValue = DEFAULT_SCALE_VALUE;
@@ -927,16 +900,25 @@ class BaseViewer {
   }
 
   _updateLocation(firstPage) {
-    const currentScale = this._currentScale;
+    // const currentScale = this._currentScale;
     const currentScaleValue = this._currentScaleValue;
+
+    // Croquet:
+    // in the standard viewer, _currentScaleValue would be a stringy (or numeric) version of
+    // _currentScale iff the user had at some point chosen a numeric preset.  for Croquet,
+    // _currentScaleValue is always numeric and _currentScale is only indirectly related to
+    // it (via browser width).
+
+    /*
     const normalizedScaleValue =
       parseFloat(currentScaleValue) === currentScale
         ? Math.round(currentScale * 10000) / 100
         : currentScaleValue;
-
+    */
+    const percentScaleValue = Math.round(parseFloat(currentScaleValue) * 10000) / 100;
     const pageNumber = firstPage.id;
     let pdfOpenParams = "#page=" + pageNumber;
-    pdfOpenParams += "&zoom=" + normalizedScaleValue;
+    pdfOpenParams += "&zoom=" + percentScaleValue;
     const currentPageView = this._pages[pageNumber - 1];
     const container = this.container;
     const topLeft = currentPageView.getPagePoint(
@@ -946,10 +928,10 @@ class BaseViewer {
     const intLeft = Math.round(topLeft[0]);
     const intTop = Math.round(topLeft[1]);
     pdfOpenParams += "," + intLeft + "," + intTop;
-
+console.log(`setting location top=${intTop}, left=${intLeft}`);
     this._location = {
       pageNumber,
-      scale: normalizedScaleValue,
+      scale: percentScaleValue,
       top: intTop,
       left: intLeft,
       rotation: this._pagesRotation,
@@ -1283,7 +1265,8 @@ class BaseViewer {
     // Non-numeric scale values can be sensitive to the scroll orientation.
     // Call this before re-scrolling to the current page, to ensure that any
     // changes in scale don't move the current page.
-    if (this._currentScaleValue && isNaN(this._currentScaleValue)) {
+    // For Croquet, all changes in orientation require recalculation.
+    if (this._currentScaleValue) {
       this._setScale(this._currentScaleValue, true);
     }
     this._setCurrentPageNumber(pageNumber, /* resetCurrentPageView = */ true);
