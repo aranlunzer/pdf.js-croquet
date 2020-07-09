@@ -164,6 +164,7 @@ class PDFLinkService {
         pageNumber,
         destArray: explicitDest,
         ignoreDestinationZoom: this._ignoreDestinationZoom,
+        publish: true, // Croquet
       });
     };
 
@@ -294,6 +295,7 @@ class PDFLinkService {
           pageNumber: pageNumber || this.page,
           destArray: dest,
           allowNegativeOffset: true,
+          publish: true, // Croquet - though we'll probably never come through here
         });
       } else if (pageNumber) {
         this.page = pageNumber; // simple page

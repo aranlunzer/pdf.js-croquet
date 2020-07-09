@@ -192,7 +192,12 @@ class PDFFindController {
       top: MATCH_SCROLL_OFFSET_TOP,
       left: MATCH_SCROLL_OFFSET_LEFT,
     };
-    scrollIntoView(element, spot, /* skipOverflowHiddenElements = */ true);
+    const scrollSpec = scrollIntoView(element, spot, /* skipOverflowHiddenElements = */ true, /* deferApplication = */ true);
+    if (scrollSpec) this._eventBus.dispatch("viewerdrivenscroll", {
+      source: this,
+      ...scrollSpec,
+      publish: true,
+    });
   }
 
   _reset() {

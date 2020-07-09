@@ -1934,6 +1934,28 @@ function webViewerInitialized() {
         fileInput: evt.dataTransfer,
       });
     });
+
+    // Croquet: also enable dragging-and-dropping a new PDF file onto the
+    // sidebarContainer (because the default is to act as if the file was
+    // dropped into the bare browser, and that's no good at all).
+    const side = document.getElementById("sidebarContainer");
+    side.addEventListener("dragover", function (evt) {
+      evt.preventDefault();
+
+      evt.dataTransfer.dropEffect = "move";
+    });
+    side.addEventListener("drop", function (evt) {
+      evt.preventDefault();
+
+      const files = evt.dataTransfer.files;
+      if (!files || files.length === 0) {
+        return;
+      }
+      PDFViewerApplication.eventBus.dispatch("fileinputchange", {
+        source: this,
+        fileInput: evt.dataTransfer,
+      });
+    });
   } else {
     appConfig.toolbar.openFile.setAttribute("hidden", "true");
     appConfig.secondaryToolbar.openFileButton.setAttribute("hidden", "true");
@@ -2461,14 +2483,8 @@ function setZoomDisabledTimeout() {
   }, WHEEL_ZOOM_DISABLED_TIMEOUT);
 }
 
-let lastWheel; // Croquet
+let lastWheelRescale; // Croquet
 function webViewerWheel(evt) {
-  // Croquet - slow down events from trackpads etc
-  const now = Date.now();
-  if (!lastWheel) lastWheel = now;
-  if (now - lastWheel < 100) return;
-  lastWheel = now;
-
   const {
     pdfViewer,
     supportedMouseWheelZoomModifierKeys,
@@ -2488,6 +2504,11 @@ function webViewerWheel(evt) {
     if (zoomDisabledTimeout || document.visibilityState === "hidden") {
       return;
     }
+    // Croquet - slow down events from trackpads etc
+    const now = Date.now();
+    if (!lastWheelRescale) lastWheelRescale = now;
+    if (now - lastWheelRescale < 100) return;
+    lastWheelRescale = now;
 
     const previousScale = parseFloat(pdfViewer.currentScaleValue); // Croquet
 
@@ -2510,8 +2531,20 @@ function webViewerWheel(evt) {
       const rect = pdfViewer.container.getBoundingClientRect();
       const dx = evt.clientX - rect.left;
       const dy = evt.clientY - rect.top;
-      pdfViewer.container.scrollLeft += dx * scaleCorrectionFactor;
-      pdfViewer.container.scrollTop += dy * scaleCorrectionFactor;
+
+      // For Croquet, don't apply the scroll update directly; tell the app.
+      if (CROQUET) {
+        const { scrollLeft, scrollTop } = pdfViewer.container;
+        PDFViewerApplication.eventBus.dispatch("viewerdrivenscroll", {
+          source: this,
+          element: pdfViewer.container,
+          left: Math.round(scrollLeft + dx * scaleCorrectionFactor),
+          top: Math.round(scrollTop + dy * scaleCorrectionFactor),
+          });
+      } else {
+        pdfViewer.container.scrollLeft += dx * scaleCorrectionFactor;
+        pdfViewer.container.scrollTop += dy * scaleCorrectionFactor;
+      }
     }
   } else {
     setZoomDisabledTimeout();

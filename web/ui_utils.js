@@ -113,20 +113,24 @@ function getOutputScale(ctx) {
 
 /**
  * Scrolls specified element into view of its parent.
+ * Croquet: now (optionally) returns the scroll information, without applying it.
  * @param {Object} element - The element to be visible.
  * @param {Object} spot - An object with optional top and left properties,
  *   specifying the offset from the top left edge.
  * @param {boolean} skipOverflowHiddenElements - Ignore elements that have
  *   the CSS rule `overflow: hidden;` set. The default is false.
+ * @param {boolean} deferApplication - Don't apply the calculated scroll,
+ *   but return a structure { element, top, left } for the
+ *   client to apply.  Default is false.  Added for Croquet.
  */
-function scrollIntoView(element, spot, skipOverflowHiddenElements = false) {
+function scrollIntoView(element, spot, skipOverflowHiddenElements = false, deferApplication = false) {
   // Assuming offsetParent is available (it's not available when viewer is in
   // hidden iframe or object). We have to scroll: if the offsetParent is not set
   // producing the error. See also animationStarted.
   let parent = element.offsetParent;
   if (!parent) {
     console.error("offsetParent is not set -- cannot scroll");
-    return;
+    return null;
   }
   let offsetY = element.offsetTop + element.clientTop;
   let offsetX = element.offsetLeft + element.clientLeft;
@@ -144,19 +148,28 @@ function scrollIntoView(element, spot, skipOverflowHiddenElements = false) {
     offsetX += parent.offsetLeft;
     parent = parent.offsetParent;
     if (!parent) {
-      return; // no need to scroll
+      return null; // no need to scroll
     }
   }
+  // Croquet: deferred-scroll handling (only reporting scrollLeft if
+  // the original code would have set a value for it)
+  const scrollSpec = { element: parent };
   if (spot) {
     if (spot.top !== undefined) {
       offsetY += spot.top;
     }
     if (spot.left !== undefined) {
       offsetX += spot.left;
-      parent.scrollLeft = Math.round(offsetX); // Croquet - don't always be truncating!
+      const scrollLeft = Math.round(offsetX); // Croquet - don't always be truncating!
+      if (deferApplication) scrollSpec.left = scrollLeft;
+      else parent.scrollLeft = scrollLeft;
     }
   }
-  parent.scrollTop = Math.round(offsetY); // Croquet - ditto
+
+  scrollSpec.top = Math.round(offsetY); // Croquet - ditto
+  if (!deferApplication) parent.scrollTop = scrollSpec.scrollTop;
+
+  return scrollSpec;
 }
 
 /**

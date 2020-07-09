@@ -191,7 +191,7 @@ html[dir='rtl'] #sidebarContent {
   border-radius: 4px;
   background: #eee;
 }
-#viewerContainer.scrollClash::-webkit-scrollbar-track {
+#viewerContainer.interactionClash::-webkit-scrollbar-track {
   background: #f88;
 }
 #viewerContainer::-webkit-scrollbar-thumb {

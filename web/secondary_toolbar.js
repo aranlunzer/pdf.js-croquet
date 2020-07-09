@@ -105,6 +105,7 @@ class SecondaryToolbar {
         eventDetails: { mode: ScrollMode.HORIZONTAL },
         close: true,
       },
+      /*
       {
         element: options.scrollWrappedButton,
         eventName: "switchscrollmode",
@@ -129,6 +130,7 @@ class SecondaryToolbar {
         eventDetails: { mode: SpreadMode.EVEN },
         close: true,
       },
+      */
       {
         element: options.documentPropertiesButton,
         eventName: "documentproperties",
@@ -156,7 +158,7 @@ class SecondaryToolbar {
     this._bindClickListeners();
     this._bindCursorToolsListener(options);
     this._bindScrollModeListener(options);
-    this._bindSpreadModeListener(options);
+    // this._bindSpreadModeListener(options);
 
     // Bind the event listener for adjusting the 'max-height' of the toolbar.
     this.eventBus._on("resize", this._setMaxHeight.bind(this));
@@ -255,6 +257,7 @@ class SecondaryToolbar {
         "toggled",
         mode === ScrollMode.HORIZONTAL
       );
+      /*
       buttons.scrollWrappedButton.classList.toggle(
         "toggled",
         mode === ScrollMode.WRAPPED
@@ -266,6 +269,7 @@ class SecondaryToolbar {
       buttons.spreadNoneButton.disabled = isScrollModeHorizontal;
       buttons.spreadOddButton.disabled = isScrollModeHorizontal;
       buttons.spreadEvenButton.disabled = isScrollModeHorizontal;
+      */
     }
     this.eventBus._on("scrollmodechanged", scrollModeChanged);
 

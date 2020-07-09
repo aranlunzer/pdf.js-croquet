@@ -15,6 +15,8 @@
 
 "use strict";
 
+const CROQUET = true;
+
 if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("CHROME")) {
   var defaultUrl; // eslint-disable-line no-var
 
@@ -218,7 +220,9 @@ function webViewerLoad() {
         // Attempt to dispatch the event at the embedding `document`,
         // in order to support cases where the viewer is embedded in
         // a *dynamically* created <iframe> element.
-        parent.document.dispatchEvent(event);
+        // Croquet: don't do that.  Our pdf app is running, and
+        // listening, in the same iframe.
+        (CROQUET ? document : parent.document).dispatchEvent(event);
       } catch (ex) {
         // The viewer could be in e.g. a cross-origin <iframe> element,
         // fallback to dispatching the event at the current `document`.

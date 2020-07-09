@@ -21,7 +21,7 @@ class PDFViewer extends BaseViewer {
     return shadow(this, "_viewerElement", this.viewer);
   }
 
-  _scrollIntoView({ pageDiv, pageSpot = null, pageNumber = null }) {
+  _scrollIntoView({ pageDiv, pageSpot = null, pageNumber = null, publish = false }) {
     if (!pageSpot && !this.isInPresentationMode) {
       const left = pageDiv.offsetLeft + pageDiv.clientLeft;
       const right = left + pageDiv.clientWidth;
@@ -34,7 +34,7 @@ class PDFViewer extends BaseViewer {
         pageSpot = { left: 0, top: 0 };
       }
     }
-    super._scrollIntoView({ pageDiv, pageSpot, pageNumber });
+    super._scrollIntoView({ pageDiv, pageSpot, pageNumber, publish });
   }
 
   _getVisiblePages() {

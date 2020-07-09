@@ -352,6 +352,30 @@ class BaseViewer {
     if (this._pagesRotation === rotation) {
       return; // The rotation didn't change.
     }
+
+    // Croquet: first make a request.  if approved, Croquet app
+    // will invoke pagesRotationApproved.
+    this.eventBus.dispatch("requestrotation", {
+      source: this,
+      rotation,
+    });
+  }
+
+  pagesRotationApproved(rotation) {
+    if (!this.pdfDocument) {
+      return;
+    }
+    if (this._pagesRotation === rotation) {
+      return; // The rotation didn't change.
+    }
+
+    // Croquet: need to hear about the change of rotation
+    // before the scroll into view.
+    this.eventBus.dispatch("beforerotationchange", {
+      source: this,
+      rotation,
+    });
+
     this._pagesRotation = rotation;
 
     const pageNumber = this._currentPageNumber;
@@ -630,17 +654,31 @@ class BaseViewer {
     this.update();
   }
 
-  _scrollIntoView({ pageDiv, pageSpot = null, pageNumber = null }) {
-    scrollIntoView(pageDiv, pageSpot);
+  _scrollIntoView({ pageDiv, pageSpot = null, pageNumber = null, publish = false }) {
+    const scrollSpec = scrollIntoView(pageDiv, pageSpot,  /* skipOverflowHiddenElements = */ false, /* deferApplication = */ true);
+    if (scrollSpec) this.eventBus.dispatch("viewerdrivenscroll", {
+      source: this,
+      ...scrollSpec,
+      publish,
+    });
+
   }
 
-  _setScaleUpdatePages(newRenderScale, newRelativeScale, noScroll = false, preset = false) {
+  _setScaleUpdatePages(newRenderScale, newRelativeScale, noScroll = false) {
     const sameRenderScale = isSameScale(this._currentScale, newRenderScale);
     const relativeScaleString = newRelativeScale.toString();
-    if (sameRenderScale && this._currentScaleValue === relativeScaleString) return;
+    const sameRelativeScale = this._currentScaleValue === relativeScaleString;
+    if (sameRenderScale && sameRelativeScale) return;
+
+    // Croquet: need to hear about the change of scale
+    // before the scroll into view.
+    this.eventBus.dispatch("beforescalechange", {
+      source: this,
+      scale: newRenderScale,
+      presetValue: relativeScaleString,
+    });
 
     this._currentScaleValue = relativeScaleString;
-console.log(`new relativeScale: ${this._currentScaleValue}, local scale: ${newRenderScale}`);
     if (!sameRenderScale) {
       for (let i = 0, ii = this._pages.length; i < ii; i++) {
         this._pages[i].update(newRenderScale);
@@ -668,9 +706,13 @@ console.log(`new relativeScale: ${this._currentScaleValue}, local scale: ${newRe
         pageNumber: page,
         destArray: dest,
         allowNegativeOffset: true,
+        publish: !sameRelativeScale,
       });
     }
-console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relativeScaleString}`);
+
+    // NB: one listener is webViewerScaleChanging (app.js), which triggers
+    // viewer update immediately.  this makes it important (probably) for
+    // scrollPageIntoView to have happened first.
     this.eventBus.dispatch("scalechanging", {
       source: this,
       scale: newRenderScale,
@@ -704,7 +746,8 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
     let hPadding = noPadding ? 0 : SCROLLBAR_PADDING;
     let vPadding = noPadding ? 0 : VERTICAL_PADDING;
 
-    if (!noPadding && this._isScrollModeHorizontal) {
+    const isHorizontal = this._isScrollModeHorizontal;
+    if (!noPadding && isHorizontal) {
       [hPadding, vPadding] = [vPadding, hPadding]; // Swap the padding values.
     }
 
@@ -718,19 +761,22 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
     // as possible to the integer value that the DOM page elements will be given.
     // here we only apply the necessary adjustment to pageWidthScale, which we expect
     // to be used in Croquet applications.
+    // because consistency of calculation across clients is extra-important, for
+    // width use not the clientWidth (which will differ depending on whether there
+    // happens to be a vertical scroll bar) but the offsetWidth.
+
+    const containerWidth = this.container.offsetWidth;
     let renderScale =
       scaleNumeric *
-      ((this.container.clientWidth - hPadding) / currentPage.width) *
+      ((containerWidth - hPadding) / currentPage.width) *
       currentPage.scale;
-    const valueThatShouldBeInteger = (this._isScrollModeHorizontal ? currentPage.width : currentPage.height) * renderScale / currentPage.scale;
+    const valueThatShouldBeInteger = (isHorizontal ? currentPage.width : currentPage.height) * renderScale / currentPage.scale;
     // the pixel size will be truncated, so add 0.01 to ensure that the scaled value
     // will truncate to the right integer (not accidentally 123.99999999998).
     const roundingFactor = (Math.round(valueThatShouldBeInteger) + 0.01) / valueThatShouldBeInteger;
     renderScale *= roundingFactor;
-    // console.log({ width: currentPage.width * renderScale / currentPage.scale, height: currentPage.height * renderScale / currentPage.scale });
 
-    this._setScaleUpdatePages(renderScale, relativeScale, noScroll, /* preset = */ false);
-    // }
+    this._setScaleUpdatePages(renderScale, relativeScale, noScroll);
   }
 
   /**
@@ -744,7 +790,7 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
     }
 
     const pageView = this._pages[this._currentPageNumber - 1];
-    this._scrollIntoView({ pageDiv: pageView.div });
+    this._scrollIntoView({ pageDiv: pageView.div, publish: true });
   }
 
   /**
@@ -767,6 +813,7 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
     destArray = null,
     allowNegativeOffset = false,
     ignoreDestinationZoom = false,
+    publish = true, // Croquet: whether to force this scroll to be published
   }) {
     if (!this.pdfDocument) {
       return;
@@ -786,7 +833,7 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
       return;
     }
 
-    if (destArray && (destArray[1].name !== "XYZ" || destArray[4])) console.warn("unexpected destArray", destArray);
+    if (destArray && destArray[1].name !== "XYZ" && destArray[1].name !== "Fit") console.warn("unexpected destArray", destArray);
 
     let x = 0,
       y = 0;
@@ -860,22 +907,25 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
         return;
     }
 
-    if (!ignoreDestinationZoom) {
-      // Croquet: keeping old code here in case we want to reinstate some
-      // kind of support for destArray scaling
-      if (!CROQUET && scale && scale !== this._currentScale) {
-        this.currentScaleValue = scale;
-      } else if (this._currentScale === UNKNOWN_SCALE) {
-        this.currentScaleValue = DEFAULT_SCALE_VALUE;
-      }
-    }
-
     if (scale === "page-fit" && !destArray[4]) {
       this._scrollIntoView({
         pageDiv: pageView.div,
         pageNumber,
+        publish,
       });
       return;
+    }
+
+    if (!ignoreDestinationZoom) {
+      // Croquet: because local scale now depends on rotation and
+      // scroll mode (as well as browser width), scale should be
+      // recalculated on every scroll into view, not just if we
+      // think the scale itself has changed.
+      if (scale /* && scale.toString() !== this._currentScaleValue */) {
+        this.currentScaleValue = scale.toString();
+      } else if (this._currentScale === UNKNOWN_SCALE) {
+        this.currentScaleValue = DEFAULT_SCALE_VALUE;
+      }
     }
 
     const boundingRect = [
@@ -884,7 +934,6 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
     ];
     let left = Math.min(boundingRect[0][0], boundingRect[1][0]);
     let top = Math.min(boundingRect[0][1], boundingRect[1][1]);
-
     if (!allowNegativeOffset) {
       // Some bad PDF generators will create destinations with e.g. top values
       // that exceeds the page height. Ensure that offsets are not negative,
@@ -896,6 +945,7 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
       pageDiv: pageView.div,
       pageSpot: { left, top },
       pageNumber,
+      publish,
     });
   }
 
@@ -928,7 +978,6 @@ console.log(`dispatch scalechanging with scale=${newRenderScale}, preset=${relat
     const intLeft = Math.round(topLeft[0]);
     const intTop = Math.round(topLeft[1]);
     pdfOpenParams += "," + intLeft + "," + intTop;
-console.log(`setting location top=${intTop}, left=${intLeft}`);
     this._location = {
       pageNumber,
       scale: percentScaleValue,
@@ -1243,6 +1292,27 @@ console.log(`setting location top=${intTop}, left=${intLeft}`);
     if (!isValidScrollMode(mode)) {
       throw new Error(`Invalid scroll mode: ${mode}`);
     }
+
+    // Croquet: first make a request.  if approved, Croquet app
+    // will invoke scrollModeApproved.
+    this.eventBus.dispatch("requestscrollmode", {
+      source: this,
+      mode,
+    });
+  }
+
+  scrollModeApproved(mode) {
+    if (this._scrollMode === mode) {
+      return; // The Scroll mode didn't change.
+    }
+
+    // Croquet: need to hear about the change of mode
+    // before the scroll into view.
+    this.eventBus.dispatch("beforescrollmodechange", {
+      source: this,
+      mode,
+    });
+
     this._scrollMode = mode;
     this.eventBus.dispatch("scrollmodechanged", { source: this, mode });
 
