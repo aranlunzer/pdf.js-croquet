@@ -621,7 +621,7 @@ class BaseViewer {
     this._pages = [];
     this._currentPageNumber = 1;
     this._currentScale = UNKNOWN_SCALE;
-    this._currentScaleValue = null;
+    this._currentScaleValue = DEFAULT_SCALE_VALUE;
     this._pageLabels = null;
     this._buffer = new PDFPageViewBuffer(DEFAULT_CACHE_SIZE);
     this._location = null;
@@ -679,9 +679,19 @@ class BaseViewer {
     });
 
     this._currentScaleValue = relativeScaleString;
+
+    // Croquet: annotate each page with the pixel coordinates of
+    // its top-left corner
+    const corner = { top: 0, left: 0 };
+    const separation = 8;
     if (!sameRenderScale) {
       for (let i = 0, ii = this._pages.length; i < ii; i++) {
-        this._pages[i].update(newRenderScale);
+        const page = this._pages[i];
+        page.update(newRenderScale);
+
+        page._croquetTopLeft = { ...corner };
+        if (this._isScrollModeHorizontal) corner.left += Math.floor(page.viewport.width) + separation;
+        else corner.top += Math.floor(page.viewport.height) + separation;
       }
       this._currentScale = newRenderScale;
     }
@@ -771,9 +781,9 @@ class BaseViewer {
       ((containerWidth - hPadding) / currentPage.width) *
       currentPage.scale;
     const valueThatShouldBeInteger = (isHorizontal ? currentPage.width : currentPage.height) * renderScale / currentPage.scale;
-    // the pixel size will be truncated, so add 0.01 to ensure that the scaled value
+    // the pixel size will be truncated, so add an epsilon to ensure that the scaled value
     // will truncate to the right integer (not accidentally 123.99999999998).
-    const roundingFactor = (Math.round(valueThatShouldBeInteger) + 0.01) / valueThatShouldBeInteger;
+    const roundingFactor = (Math.round(valueThatShouldBeInteger) + 0.001) / valueThatShouldBeInteger;
     renderScale *= roundingFactor;
 
     this._setScaleUpdatePages(renderScale, relativeScale, noScroll);

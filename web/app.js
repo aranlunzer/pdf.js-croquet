@@ -2276,6 +2276,8 @@ function webViewerHashchange(evt) {
 let webViewerFileInputChange, webViewerOpenFile;
 if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
   webViewerFileInputChange = function (evt) {
+    if (CROQUET) return; // Croquet will control everything
+
     if (
       PDFViewerApplication.pdfViewer &&
       PDFViewerApplication.pdfViewer.isInPresentationMode

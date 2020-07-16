@@ -170,8 +170,8 @@ const defaultOptions = {
     /** @type {string} */
     value:
       typeof PDFJSDev === "undefined" || !PDFJSDev.test("PRODUCTION")
-        ? "../external/bcmaps/" // ael: as is
-        : "./web/cmaps/",       // used to be ../web/
+        ? "../external/bcmaps/"
+        : "./web/cmaps/", // Croquet file organisation
     kind: OptionKind.API,
   },
   disableAutoFetch: {
@@ -234,8 +234,8 @@ const defaultOptions = {
     /** @type {string} */
     value:
       typeof PDFJSDev === "undefined" || !PDFJSDev.test("PRODUCTION")
-        ? "../src/worker_loader.js" // ael - this is original value
-        : "./build/pdf.worker.js",  // ...but this was ../build/
+        ? "../src/worker_loader.js"
+        : "./build/pdf.worker.js", // Croquet file organisation
     kind: OptionKind.WORKER,
   },
 };
