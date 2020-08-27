@@ -73,7 +73,7 @@
       "enforceForClassMembers": true,
     }],
     "consistent-return": "error",
-    "curly": ["error", "all"],
+    // "curly": ["error", "all"],    off for Croquet
     "default-case-last": "error",
     "dot-notation": "error",
     "eqeqeq": ["error", "always"],
@@ -135,11 +135,13 @@
 
     // Stylistic Issues
     "lines-between-class-members": ["error", "always"],
+    /* off for Croquet
     "max-len": ["error", {
       "code": 1000,
       "comments": 80,
       "ignoreUrls": true
     }],
+    */
     "new-cap": ["error", { "newIsCap": true, "capIsNew": false, }],
     "no-array-constructor": "error",
     "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 0, "maxBOF": 1, }],
@@ -191,5 +193,8 @@
       "ignoreCase": true,
     }],
     "template-curly-spacing": ["error", "never"],
+
+    // Croquet tweaks to reduce fussiness
+    "prettier/prettier": "off",
   },
 }

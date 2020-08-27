@@ -43,7 +43,7 @@ import { PDFPageView } from "./pdf_page_view.js";
 import { SimpleLinkService } from "./pdf_link_service.js";
 import { TextLayerBuilder } from "./text_layer_builder.js";
 
-const CROQUET = true;
+// const CROQUET = true;
 
 const DEFAULT_CACHE_SIZE = 10;
 
@@ -753,11 +753,11 @@ class BaseViewer {
       return;
     }
     const noPadding = this.isInPresentationMode || this.removePageBorders;
-    let hPadding = noPadding ? 0 : SCROLLBAR_PADDING;
+    let hPadding = noPadding ? 14 : SCROLLBAR_PADDING; // @@ hack: expect a vertical scrollbar of 14px
     let vPadding = noPadding ? 0 : VERTICAL_PADDING;
 
     const isHorizontal = this._isScrollModeHorizontal;
-    if (!noPadding && isHorizontal) {
+    if (/* !noPadding && */ isHorizontal) { // @@ ...since noPadding doesn't actually mean no padding
       [hPadding, vPadding] = [vPadding, hPadding]; // Swap the padding values.
     }
 
