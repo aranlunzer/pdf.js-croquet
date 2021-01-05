@@ -1150,9 +1150,13 @@ const PDFViewerApplication = {
             }
           }
           // Always let the user preference/view history take precedence.
+
+          // NB: pageMode (document-held sidebar preference) disabled for Croquet.
+          /*
           if (pageMode && sidebarView === SidebarView.UNKNOWN) {
             sidebarView = apiPageModeToSidebarView(pageMode);
           }
+          */
           if (pageLayout && spreadMode === SpreadMode.UNKNOWN) {
             spreadMode = apiPageLayoutToSpreadMode(pageLayout);
           }
