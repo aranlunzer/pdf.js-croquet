@@ -1921,10 +1921,13 @@ function webViewerInitialized() {
     });
 
     // Enable dragging-and-dropping a new PDF file onto the viewerContainer.
+    appConfig.mainContainer.addEventListener("dragenter", function (evt) {
+      evt.preventDefault();
+      evt.dataTransfer.dropEffect = "copy";
+    });
     appConfig.mainContainer.addEventListener("dragover", function (evt) {
       evt.preventDefault();
-
-      evt.dataTransfer.dropEffect = "move";
+      evt.dataTransfer.dropEffect = "copy";
     });
     appConfig.mainContainer.addEventListener("drop", function (evt) {
       evt.preventDefault();
@@ -1943,10 +1946,13 @@ function webViewerInitialized() {
     // sidebarContainer (because the default is to act as if the file was
     // dropped into the bare browser, and that's no good at all).
     const side = document.getElementById("sidebarContainer");
+    side.addEventListener("dragenter", function (evt) {
+      evt.preventDefault();
+      evt.dataTransfer.dropEffect = "copy";
+    });
     side.addEventListener("dragover", function (evt) {
       evt.preventDefault();
-
-      evt.dataTransfer.dropEffect = "move";
+      evt.dataTransfer.dropEffect = "copy";
     });
     side.addEventListener("drop", function (evt) {
       evt.preventDefault();
