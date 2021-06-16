@@ -235,7 +235,7 @@ const defaultOptions = {
     value:
       typeof PDFJSDev === "undefined" || !PDFJSDev.test("PRODUCTION")
         ? "../src/worker_loader.js"
-        : "./build/pdf.worker.js", // Croquet file organisation
+        : "./build/pdf.worker.js", // ...but Croquet will probably override
     kind: OptionKind.WORKER,
   },
 };

@@ -1920,6 +1920,11 @@ function webViewerInitialized() {
       });
     });
 
+    // Croquet - fileInput's "change" event won't fire if same file is selected
+    // again (even if the file's contents have changed).  various stackoverflow
+    // posts recommend the following as a suitable cross-platform workaround.
+    fileInput.addEventListener("click", function(evt) { fileInput.value = null; });
+
     // Enable dragging-and-dropping a new PDF file onto the viewerContainer.
     appConfig.mainContainer.addEventListener("dragenter", function (evt) {
       evt.preventDefault();
